@@ -6,6 +6,7 @@ import {
   findTickets,
   findTicketById,
   updateTicketStatus,
+  updateTicketAgent,
 } from "../repositories/ticketRepository";
 
 // =====================================================
@@ -176,8 +177,7 @@ export async function createNewTicket(
     if (!emailPattern.test(customerEmail.trim())) {
       res.status(400).json({
         success: false,
-        message:
-          "Please enter a valid email address",
+        message: "Please enter a valid email address",
       });
       return;
     }
@@ -212,8 +212,7 @@ export async function createNewTicket(
 
     res.status(201).json({
       success: true,
-      message:
-        "Ticket created successfully",
+      message: "Ticket created successfully",
       ticketId,
     });
   } catch (error: unknown) {
@@ -243,7 +242,6 @@ export async function changeTicketStatus(
       return;
     }
 
-    // Get new status
     const { status } = req.body as {
       status?: string;
     };
@@ -280,10 +278,7 @@ export async function changeTicketStatus(
 
     const currentStatus = ticket.status;
 
-    // =================================================
-    // STATUS WORKFLOW
-    // =================================================
-
+    // Status workflow
     const allowedTransitions: Record<
       string,
       string[]
@@ -292,14 +287,11 @@ export async function changeTicketStatus(
         "IN_PROGRESS",
         "CLOSED",
       ],
-
       IN_PROGRESS: [
         "RESOLVED",
         "CLOSED",
       ],
-
       RESOLVED: [],
-
       CLOSED: [],
     };
 
@@ -326,8 +318,7 @@ export async function changeTicketStatus(
     if (!updated) {
       res.status(400).json({
         success: false,
-        message:
-          "Status was not updated",
+        message: "Status was not updated",
       });
       return;
     }
@@ -337,6 +328,82 @@ export async function changeTicketStatus(
       message:
         "Ticket status updated successfully",
       status,
+    });
+  } catch (error: unknown) {
+    next(error);
+  }
+}
+
+// =====================================================
+// ASSIGN AGENT
+// PATCH /api/tickets/:id/agent
+// =====================================================
+
+export async function assignTicketAgent(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const ticketId = Number(req.params.id);
+    const { agentId } = req.body as {
+      agentId?: number;
+    };
+
+    // Validate ticket ID
+    if (
+      !Number.isInteger(ticketId) ||
+      ticketId <= 0
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid ticket ID",
+      });
+      return;
+    }
+
+    // Validate agent ID
+    if (
+      agentId === undefined ||
+      !Number.isInteger(Number(agentId)) ||
+      Number(agentId) <= 0
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Valid agent ID is required",
+      });
+      return;
+    }
+
+    // Check ticket exists
+    const ticket = await findTicketById(ticketId);
+
+    if (!ticket) {
+      res.status(404).json({
+        success: false,
+        message: "Ticket not found",
+      });
+      return;
+    }
+
+    // Update agent
+    const updated = await updateTicketAgent(
+      ticketId,
+      Number(agentId)
+    );
+
+    if (!updated) {
+      res.status(400).json({
+        success: false,
+        message: "Agent was not assigned",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Agent assigned successfully",
+      agentId: Number(agentId),
     });
   } catch (error: unknown) {
     next(error);

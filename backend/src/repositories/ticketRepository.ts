@@ -208,6 +208,27 @@ export async function updateTicketStatus(
 }
 
 // =====================================================
+// UPDATE TICKET AGENT
+// =====================================================
+
+export async function updateTicketAgent(
+  ticketId: number,
+  agentId: number
+): Promise<boolean> {
+  const [result] =
+    await pool.execute<ResultSetHeader>(
+      `
+      UPDATE tickets
+      SET agent_id = ?
+      WHERE id = ?
+      `,
+      [agentId, ticketId]
+    );
+
+  return result.affectedRows > 0;
+}
+
+// =====================================================
 // CREATE CUSTOMER
 // =====================================================
 
