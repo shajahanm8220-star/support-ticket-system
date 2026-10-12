@@ -35,7 +35,7 @@ export async function findTickets(
   const conditions: string[] = [];
   const values: unknown[] = [];
 
-  // Search
+  // Search by customer name, email, or ticket subject
   if (search) {
     const searchValue = `%${search}%`;
 
@@ -54,26 +54,26 @@ export async function findTickets(
     );
   }
 
-  // Status filter
+  // Filter by status
   if (status) {
     conditions.push("t.status = ?");
     values.push(status);
   }
 
-  // Priority filter
+  // Filter by priority
   if (priority) {
     conditions.push("t.priority = ?");
     values.push(priority);
   }
 
-  // Category filter
+  // Filter by category
   if (category) {
     conditions.push("t.category = ?");
     values.push(category);
   }
 
-  // Agent filter
-  if (agentId) {
+  // Filter by assigned agent
+  if (agentId !== undefined) {
     conditions.push("t.agent_id = ?");
     values.push(agentId);
   }
@@ -88,9 +88,7 @@ export async function findTickets(
 
   if (sort === "oldest") {
     orderBy = "t.created_at ASC";
-  }
-
-  if (sort === "priority") {
+  } else if (sort === "priority") {
     orderBy = `
       CASE t.priority
         WHEN 'CRITICAL' THEN 1
@@ -103,7 +101,7 @@ export async function findTickets(
     `;
   }
 
-  // Get tickets
+  // Retrieve paginated tickets
   const [rows] = await pool.query<TicketRow[]>(
     `
     SELECT
@@ -132,17 +130,18 @@ export async function findTickets(
     [...values, limit, offset]
   );
 
-  // Get total count
-  const [countRows] = await pool.query<RowDataPacket[]>(
-    `
-    SELECT COUNT(*) AS total
-    FROM tickets t
-    INNER JOIN customers c
-      ON c.id = t.customer_id
-    ${whereClause}
-    `,
-    values
-  );
+  // Retrieve total matching ticket count
+  const [countRows] =
+    await pool.query<RowDataPacket[]>(
+      `
+      SELECT COUNT(*) AS total
+      FROM tickets t
+      INNER JOIN customers c
+        ON c.id = t.customer_id
+      ${whereClause}
+      `,
+      values
+    );
 
   return {
     rows,
@@ -151,7 +150,7 @@ export async function findTickets(
 }
 
 // =====================================================
-// GET ONE TICKET BY ID
+// GET TICKET BY ID
 // =====================================================
 
 export async function findTicketById(
@@ -198,7 +197,9 @@ export async function updateTicketStatus(
     await pool.execute<ResultSetHeader>(
       `
       UPDATE tickets
-      SET status = ?
+      SET
+        status = ?,
+        updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
       `,
       [status, id]
@@ -219,7 +220,9 @@ export async function updateTicketAgent(
     await pool.execute<ResultSetHeader>(
       `
       UPDATE tickets
-      SET agent_id = ?
+      SET
+        agent_id = ?,
+        updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
       `,
       [agentId, ticketId]
@@ -282,4 +285,58 @@ export async function createTicket(
     );
 
   return result.insertId;
+}
+
+// =====================================================
+// UPDATE TICKET DETAILS
+// =====================================================
+
+export async function updateTicket(
+  id: number,
+  subject: string,
+  description: string,
+  priority: string,
+  category: string
+): Promise<boolean> {
+  const [result] =
+    await pool.execute<ResultSetHeader>(
+      `
+      UPDATE tickets
+      SET
+        subject = ?,
+        description = ?,
+        priority = ?,
+        category = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+      `,
+      [
+        subject,
+        description,
+        priority,
+        category,
+        id,
+      ]
+    );
+
+  return result.affectedRows > 0;
+}
+
+// =====================================================
+// DELETE TICKET
+// =====================================================
+
+export async function deleteTicket(
+  id: number
+): Promise<boolean> {
+  const [result] =
+    await pool.execute<ResultSetHeader>(
+      `
+      DELETE FROM tickets
+      WHERE id = ?
+      `,
+      [id]
+    );
+
+  return result.affectedRows > 0;
 }

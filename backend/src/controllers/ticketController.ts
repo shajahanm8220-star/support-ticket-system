@@ -7,11 +7,12 @@ import {
   findTicketById,
   updateTicketStatus,
   updateTicketAgent,
+  updateTicket,
+  deleteTicket,
 } from "../repositories/ticketRepository";
 
 // =====================================================
 // GET ALL TICKETS
-// GET /api/tickets
 // =====================================================
 
 export async function getTickets(
@@ -21,18 +22,21 @@ export async function getTickets(
 ): Promise<void> {
   try {
     const page = Math.max(
-      Number(req.query.page) || 1,
-      1
+      1,
+      Number.parseInt(String(req.query.page ?? "1"), 10) || 1
     );
 
     const limit = Math.min(
-      Math.max(Number(req.query.limit) || 10, 1),
-      100
+      100,
+      Math.max(
+        1,
+        Number.parseInt(String(req.query.limit ?? "10"), 10) || 10
+      )
     );
 
     const search =
       typeof req.query.search === "string"
-        ? req.query.search
+        ? req.query.search.trim()
         : undefined;
 
     const status =
@@ -51,7 +55,8 @@ export async function getTickets(
         : undefined;
 
     const agentId =
-      req.query.agentId !== undefined
+      typeof req.query.agentId === "string" &&
+      req.query.agentId.trim() !== ""
         ? Number(req.query.agentId)
         : undefined;
 
@@ -59,6 +64,17 @@ export async function getTickets(
       typeof req.query.sort === "string"
         ? req.query.sort
         : undefined;
+
+    if (
+      agentId !== undefined &&
+      (!Number.isInteger(agentId) || agentId <= 0)
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid agent ID",
+      });
+      return;
+    }
 
     const offset = (page - 1) * limit;
 
@@ -74,13 +90,14 @@ export async function getTickets(
     );
 
     res.status(200).json({
+      success: true,
       data: result.rows,
-      page,
-      limit,
-      total: result.total,
-      totalPages: Math.ceil(
-        result.total / limit
-      ),
+      pagination: {
+        page,
+        limit,
+        total: result.total,
+        totalPages: Math.ceil(result.total / limit),
+      },
     });
   } catch (error: unknown) {
     next(error);
@@ -88,8 +105,7 @@ export async function getTickets(
 }
 
 // =====================================================
-// GET SINGLE TICKET
-// GET /api/tickets/:id
+// GET TICKET BY ID
 // =====================================================
 
 export async function getTicketById(
@@ -128,8 +144,7 @@ export async function getTicketById(
 }
 
 // =====================================================
-// CREATE TICKET
-// POST /api/tickets
+// CREATE NEW TICKET
 // =====================================================
 
 export async function createNewTicket(
@@ -146,74 +161,307 @@ export async function createNewTicket(
       priority,
       category,
     } = req.body as {
-      customerName?: string;
-      customerEmail?: string;
-      subject?: string;
-      description?: string;
-      priority?: string;
-      category?: string;
+      customerName?: unknown;
+      customerEmail?: unknown;
+      subject?: unknown;
+      description?: unknown;
+      priority?: unknown;
+      category?: unknown;
     };
 
-    // Required fields
     if (
-      !customerName ||
-      !customerEmail ||
-      !subject ||
-      !priority ||
-      !category
+      typeof customerName !== "string" ||
+      typeof customerEmail !== "string" ||
+      typeof subject !== "string" ||
+      typeof description !== "string" ||
+      typeof priority !== "string" ||
+      typeof category !== "string"
     ) {
       res.status(400).json({
         success: false,
-        message:
-          "Name, email, subject, priority and category are required",
+        message: "All ticket fields must be provided as strings",
       });
       return;
     }
 
-    // Email validation
-    const emailPattern =
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const normalizedName = customerName.trim();
+    const normalizedEmail = customerEmail.trim();
+    const normalizedSubject = subject.trim();
+    const normalizedDescription = description.trim();
+    const normalizedPriority = priority.trim().toUpperCase();
+    const normalizedCategory = category.trim().toUpperCase();
 
-    if (!emailPattern.test(customerEmail.trim())) {
-      res.status(400).json({
-        success: false,
-        message: "Please enter a valid email address",
-      });
-      return;
-    }
-
-    // Description validation
     if (
-      !description ||
-      description.trim().length < 10
+      !normalizedName ||
+      !normalizedEmail ||
+      !normalizedSubject ||
+      !normalizedDescription ||
+      !normalizedPriority ||
+      !normalizedCategory
     ) {
       res.status(400).json({
         success: false,
-        message:
-          "Description must contain at least 10 characters",
+        message: "All ticket fields are required",
       });
       return;
     }
 
-    // Create customer
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailPattern.test(normalizedEmail)) {
+      res.status(400).json({
+        success: false,
+        message: "Please provide a valid customer email",
+      });
+      return;
+    }
+
+    if (normalizedDescription.length < 10) {
+      res.status(400).json({
+        success: false,
+        message: "Description must contain at least 10 characters",
+      });
+      return;
+    }
+
+    const allowedPriorities = [
+      "LOW",
+      "MEDIUM",
+      "HIGH",
+      "CRITICAL",
+    ];
+
+    const allowedCategories = [
+      "TECHNICAL",
+      "BILLING",
+      "ACCOUNT",
+      "GENERAL",
+    ];
+
+    if (!allowedPriorities.includes(normalizedPriority)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid priority",
+      });
+      return;
+    }
+
+    if (!allowedCategories.includes(normalizedCategory)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid category",
+      });
+      return;
+    }
+
     const customerId = await createCustomer(
-      customerName.trim(),
-      customerEmail.trim()
+      normalizedName,
+      normalizedEmail
     );
 
-    // Create ticket
     const ticketId = await createTicket(
       customerId,
-      subject.trim(),
-      description.trim(),
-      priority,
-      category
+      normalizedSubject,
+      normalizedDescription,
+      normalizedPriority,
+      normalizedCategory
     );
 
     res.status(201).json({
       success: true,
       message: "Ticket created successfully",
-      ticketId,
+      data: {
+        id: ticketId,
+        customer_id: customerId,
+      },
+    });
+  } catch (error: unknown) {
+    next(error);
+  }
+}
+
+// =====================================================
+// UPDATE TICKET DETAILS
+// =====================================================
+
+export async function updateTicketController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid ticket ID",
+      });
+      return;
+    }
+
+    const {
+      subject,
+      description,
+      priority,
+      category,
+    } = req.body as {
+      subject?: unknown;
+      description?: unknown;
+      priority?: unknown;
+      category?: unknown;
+    };
+
+    if (
+      typeof subject !== "string" ||
+      typeof description !== "string" ||
+      typeof priority !== "string" ||
+      typeof category !== "string"
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Subject, description, priority, and category are required",
+      });
+      return;
+    }
+
+    const normalizedSubject = subject.trim();
+    const normalizedDescription = description.trim();
+    const normalizedPriority = priority.trim().toUpperCase();
+    const normalizedCategory = category.trim().toUpperCase();
+
+    if (
+      !normalizedSubject ||
+      !normalizedDescription ||
+      !normalizedPriority ||
+      !normalizedCategory
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Ticket fields cannot be empty",
+      });
+      return;
+    }
+
+    if (normalizedDescription.length < 10) {
+      res.status(400).json({
+        success: false,
+        message: "Description must contain at least 10 characters",
+      });
+      return;
+    }
+
+    const allowedPriorities = [
+      "LOW",
+      "MEDIUM",
+      "HIGH",
+      "CRITICAL",
+    ];
+
+    const allowedCategories = [
+      "TECHNICAL",
+      "BILLING",
+      "ACCOUNT",
+      "GENERAL",
+    ];
+
+    if (!allowedPriorities.includes(normalizedPriority)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid priority",
+      });
+      return;
+    }
+
+    if (!allowedCategories.includes(normalizedCategory)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid category",
+      });
+      return;
+    }
+
+    const existingTicket = await findTicketById(id);
+
+    if (!existingTicket) {
+      res.status(404).json({
+        success: false,
+        message: "Ticket not found",
+      });
+      return;
+    }
+
+    const updated = await updateTicket(
+      id,
+      normalizedSubject,
+      normalizedDescription,
+      normalizedPriority,
+      normalizedCategory
+    );
+
+    if (!updated) {
+      res.status(500).json({
+        success: false,
+        message: "Unable to update ticket",
+      });
+      return;
+    }
+
+    const ticket = await findTicketById(id);
+
+    res.status(200).json({
+      success: true,
+      message: "Ticket updated successfully",
+      data: ticket,
+    });
+  } catch (error: unknown) {
+    next(error);
+  }
+}
+
+// =====================================================
+// DELETE TICKET
+// =====================================================
+
+export async function deleteTicketController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid ticket ID",
+      });
+      return;
+    }
+
+    const existingTicket = await findTicketById(id);
+
+    if (!existingTicket) {
+      res.status(404).json({
+        success: false,
+        message: "Ticket not found",
+      });
+      return;
+    }
+
+    const deleted = await deleteTicket(id);
+
+    if (!deleted) {
+      res.status(500).json({
+        success: false,
+        message: "Unable to delete ticket",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Ticket deleted successfully",
     });
   } catch (error: unknown) {
     next(error);
@@ -222,7 +470,6 @@ export async function createNewTicket(
 
 // =====================================================
 // CHANGE TICKET STATUS
-// PATCH /api/tickets/:id/status
 // =====================================================
 
 export async function changeTicketStatus(
@@ -232,8 +479,10 @@ export async function changeTicketStatus(
 ): Promise<void> {
   try {
     const id = Number(req.params.id);
+    const { status } = req.body as {
+      status?: unknown;
+    };
 
-    // Validate ticket ID
     if (!Number.isInteger(id) || id <= 0) {
       res.status(400).json({
         success: false,
@@ -242,9 +491,15 @@ export async function changeTicketStatus(
       return;
     }
 
-    const { status } = req.body as {
-      status?: string;
-    };
+    if (typeof status !== "string") {
+      res.status(400).json({
+        success: false,
+        message: "Status is required",
+      });
+      return;
+    }
+
+    const normalizedStatus = status.trim().toUpperCase();
 
     const allowedStatuses = [
       "OPEN",
@@ -253,19 +508,14 @@ export async function changeTicketStatus(
       "CLOSED",
     ];
 
-    // Validate status
-    if (
-      !status ||
-      !allowedStatuses.includes(status)
-    ) {
+    if (!allowedStatuses.includes(normalizedStatus)) {
       res.status(400).json({
         success: false,
-        message: "Invalid status",
+        message: "Invalid ticket status",
       });
       return;
     }
 
-    // Find current ticket
     const ticket = await findTicketById(id);
 
     if (!ticket) {
@@ -276,58 +526,33 @@ export async function changeTicketStatus(
       return;
     }
 
-    const currentStatus = ticket.status;
-
-    // Status workflow
-    const allowedTransitions: Record<
-      string,
-      string[]
-    > = {
-      OPEN: [
-        "IN_PROGRESS",
-        "CLOSED",
-      ],
-      IN_PROGRESS: [
-        "RESOLVED",
-        "CLOSED",
-      ],
+    const allowedTransitions: Record<string, string[]> = {
+      OPEN: ["IN_PROGRESS", "CLOSED"],
+      IN_PROGRESS: ["RESOLVED", "CLOSED"],
       RESOLVED: [],
       CLOSED: [],
     };
 
-    const nextStatuses =
-      allowedTransitions[currentStatus] || [];
-
-    // Check whether transition is allowed
-    if (!nextStatuses.includes(status)) {
+    if (
+      !allowedTransitions[ticket.status]?.includes(
+        normalizedStatus
+      )
+    ) {
       res.status(400).json({
         success: false,
-        message:
-          `Cannot change status from ${currentStatus} to ${status}`,
+        message: `Cannot change status from ${ticket.status} to ${normalizedStatus}`,
       });
       return;
     }
 
-    // Update status in MySQL
-    const updated =
-      await updateTicketStatus(
-        id,
-        status
-      );
+    await updateTicketStatus(id, normalizedStatus);
 
-    if (!updated) {
-      res.status(400).json({
-        success: false,
-        message: "Status was not updated",
-      });
-      return;
-    }
+    const updatedTicket = await findTicketById(id);
 
     res.status(200).json({
       success: true,
-      message:
-        "Ticket status updated successfully",
-      status,
+      message: "Ticket status updated successfully",
+      data: updatedTicket,
     });
   } catch (error: unknown) {
     next(error);
@@ -335,8 +560,7 @@ export async function changeTicketStatus(
 }
 
 // =====================================================
-// ASSIGN AGENT
-// PATCH /api/tickets/:id/agent
+// ASSIGN TICKET TO AGENT
 // =====================================================
 
 export async function assignTicketAgent(
@@ -346,15 +570,12 @@ export async function assignTicketAgent(
 ): Promise<void> {
   try {
     const ticketId = Number(req.params.id);
+
     const { agentId } = req.body as {
-      agentId?: number;
+      agentId?: unknown;
     };
 
-    // Validate ticket ID
-    if (
-      !Number.isInteger(ticketId) ||
-      ticketId <= 0
-    ) {
+    if (!Number.isInteger(ticketId) || ticketId <= 0) {
       res.status(400).json({
         success: false,
         message: "Invalid ticket ID",
@@ -362,20 +583,18 @@ export async function assignTicketAgent(
       return;
     }
 
-    // Validate agent ID
     if (
-      agentId === undefined ||
-      !Number.isInteger(Number(agentId)) ||
-      Number(agentId) <= 0
+      typeof agentId !== "number" ||
+      !Number.isInteger(agentId) ||
+      agentId <= 0
     ) {
       res.status(400).json({
         success: false,
-        message: "Valid agent ID is required",
+        message: "A valid numeric agentId is required",
       });
       return;
     }
 
-    // Check ticket exists
     const ticket = await findTicketById(ticketId);
 
     if (!ticket) {
@@ -386,26 +605,30 @@ export async function assignTicketAgent(
       return;
     }
 
-    // Update agent
-    const updated = await updateTicketAgent(
-      ticketId,
-      Number(agentId)
-    );
+    const updated = await updateTicketAgent(ticketId, agentId);
 
     if (!updated) {
       res.status(400).json({
         success: false,
-        message: "Agent was not assigned",
+        message: "Unable to assign agent. Check that the agent exists.",
       });
       return;
     }
 
+    const updatedTicket = await findTicketById(ticketId);
+
     res.status(200).json({
       success: true,
       message: "Agent assigned successfully",
-      agentId: Number(agentId),
+      data: updatedTicket,
     });
   } catch (error: unknown) {
     next(error);
   }
 }
+
+// Export names used by ticketRoutes.ts
+export {
+  updateTicketController as updateTicket,
+  deleteTicketController as deleteTicket,
+};
