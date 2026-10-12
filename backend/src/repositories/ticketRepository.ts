@@ -47,11 +47,7 @@ export async function findTickets(
       )
     `);
 
-    values.push(
-      searchValue,
-      searchValue,
-      searchValue
-    );
+    values.push(searchValue, searchValue, searchValue);
   }
 
   // Filter by status
@@ -90,7 +86,7 @@ export async function findTickets(
     orderBy = "t.created_at ASC";
   } else if (sort === "priority") {
     orderBy = `
-      CASE t.priority
+      CASE UPPER(t.priority)
         WHEN 'CRITICAL' THEN 1
         WHEN 'HIGH' THEN 2
         WHEN 'MEDIUM' THEN 3
@@ -131,17 +127,16 @@ export async function findTickets(
   );
 
   // Retrieve total matching ticket count
-  const [countRows] =
-    await pool.query<RowDataPacket[]>(
-      `
-      SELECT COUNT(*) AS total
-      FROM tickets t
-      INNER JOIN customers c
-        ON c.id = t.customer_id
-      ${whereClause}
-      `,
-      values
-    );
+  const [countRows] = await pool.query<RowDataPacket[]>(
+    `
+    SELECT COUNT(*) AS total
+    FROM tickets t
+    INNER JOIN customers c
+      ON c.id = t.customer_id
+    ${whereClause}
+    `,
+    values
+  );
 
   return {
     rows,
@@ -193,17 +188,16 @@ export async function updateTicketStatus(
   id: number,
   status: string
 ): Promise<boolean> {
-  const [result] =
-    await pool.execute<ResultSetHeader>(
-      `
-      UPDATE tickets
-      SET
-        status = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-      `,
-      [status, id]
-    );
+  const [result] = await pool.execute<ResultSetHeader>(
+    `
+    UPDATE tickets
+    SET
+      status = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+    `,
+    [status, id]
+  );
 
   return result.affectedRows > 0;
 }
@@ -216,37 +210,54 @@ export async function updateTicketAgent(
   ticketId: number,
   agentId: number
 ): Promise<boolean> {
-  const [result] =
-    await pool.execute<ResultSetHeader>(
-      `
-      UPDATE tickets
-      SET
-        agent_id = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-      `,
-      [agentId, ticketId]
-    );
+  const [result] = await pool.execute<ResultSetHeader>(
+    `
+    UPDATE tickets
+    SET
+      agent_id = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+    `,
+    [agentId, ticketId]
+  );
 
   return result.affectedRows > 0;
 }
 
 // =====================================================
-// CREATE CUSTOMER
+// CREATE CUSTOMER OR REUSE EXISTING CUSTOMER
 // =====================================================
 
 export async function createCustomer(
   name: string,
   email: string
 ): Promise<number> {
-  const [result] =
-    await pool.execute<ResultSetHeader>(
-      `
-      INSERT INTO customers (name, email)
-      VALUES (?, ?)
-      `,
-      [name, email]
-    );
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // Find the existing customer by email
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    `
+    SELECT id
+    FROM customers
+    WHERE LOWER(email) = ?
+    LIMIT 1
+    `,
+    [normalizedEmail]
+  );
+
+  // Reuse the existing customer's ID
+  if (rows.length > 0) {
+    return Number(rows[0].id);
+  }
+
+  // Insert a new customer when the email does not exist
+  const [result] = await pool.execute<ResultSetHeader>(
+    `
+    INSERT INTO customers (name, email)
+    VALUES (?, ?)
+    `,
+    [name.trim(), normalizedEmail]
+  );
 
   return result.insertId;
 }
@@ -262,27 +273,26 @@ export async function createTicket(
   priority: string,
   category: string
 ): Promise<number> {
-  const [result] =
-    await pool.execute<ResultSetHeader>(
-      `
-      INSERT INTO tickets
-      (
-        customer_id,
-        subject,
-        description,
-        priority,
-        category
-      )
-      VALUES (?, ?, ?, ?, ?)
-      `,
-      [
-        customerId,
-        subject,
-        description,
-        priority,
-        category,
-      ]
-    );
+  const [result] = await pool.execute<ResultSetHeader>(
+    `
+    INSERT INTO tickets
+    (
+      customer_id,
+      subject,
+      description,
+      priority,
+      category
+    )
+    VALUES (?, ?, ?, ?, ?)
+    `,
+    [
+      customerId,
+      subject,
+      description,
+      priority,
+      category,
+    ]
+  );
 
   return result.insertId;
 }
@@ -298,26 +308,25 @@ export async function updateTicket(
   priority: string,
   category: string
 ): Promise<boolean> {
-  const [result] =
-    await pool.execute<ResultSetHeader>(
-      `
-      UPDATE tickets
-      SET
-        subject = ?,
-        description = ?,
-        priority = ?,
-        category = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-      `,
-      [
-        subject,
-        description,
-        priority,
-        category,
-        id,
-      ]
-    );
+  const [result] = await pool.execute<ResultSetHeader>(
+    `
+    UPDATE tickets
+    SET
+      subject = ?,
+      description = ?,
+      priority = ?,
+      category = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+    `,
+    [
+      subject,
+      description,
+      priority,
+      category,
+      id,
+    ]
+  );
 
   return result.affectedRows > 0;
 }
@@ -329,14 +338,13 @@ export async function updateTicket(
 export async function deleteTicket(
   id: number
 ): Promise<boolean> {
-  const [result] =
-    await pool.execute<ResultSetHeader>(
-      `
-      DELETE FROM tickets
-      WHERE id = ?
-      `,
-      [id]
-    );
+  const [result] = await pool.execute<ResultSetHeader>(
+    `
+    DELETE FROM tickets
+    WHERE id = ?
+    `,
+    [id]
+  );
 
   return result.affectedRows > 0;
 }
