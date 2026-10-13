@@ -4,37 +4,49 @@ A full-stack web application for managing customer support tickets, built with N
 
 ## Overview
 
-The Support Ticket Management System helps support teams manage customer issues from a centralized application.
+The Support Ticket Management System helps support teams manage customer issues through a centralized application.
 
 Users can create tickets, view ticket details, search and filter tickets, manage ticket status, and assign support agents. The backend provides REST APIs, while MySQL stores the application data.
 
 ## Features
 
-- Create support tickets
-- View all tickets
-- View individual ticket details
-- Search tickets by customer name, customer email, or subject
-- Filter tickets by status
-- Filter tickets by priority
-- Filter tickets by category
-- Filter tickets by assigned agent
-- Sort ticket listings
-- Paginate ticket results
-- Assign support agents to tickets
-- Update ticket status
-- Update and delete tickets
-- Manage customer and agent information
-- Store application data in MySQL
-- Responsive user interface
-- REST API integration
-- Environment-based database configuration
+### Dashboard
+- View total ticket statistics.
+- Monitor ticket statuses.
+- View recent tickets.
+- Retrieve dashboard information from the backend API.
+
+### Ticket Management
+- Create support tickets.
+- View all tickets.
+- View individual ticket details.
+- Search tickets by customer name, customer email, or subject.
+- Filter tickets by status, priority, category, and assigned agent.
+- Sort ticket listings.
+- Paginate ticket results.
+- Update ticket information.
+- Update ticket status.
+- Assign support agents to tickets.
+- Delete tickets if the delete functionality is implemented.
+
+### Agent Management
+- Retrieve support agents.
+- Display agent information.
+- Assign agents to tickets if supported by the application.
+
+### Additional Features
+- MySQL database integration.
+- REST API integration.
+- Environment-based configuration.
+- Responsive user interface.
+- Loading, error, and empty states where implemented.
 
 > Only retain features that are implemented and working in the submitted version.
 
 ## Technology Stack
 
 ### Frontend
-- Next.js
+- Next.js 16
 - React
 - TypeScript
 - Tailwind CSS
@@ -67,7 +79,7 @@ User
  v
 Next.js Frontend
  |
- | HTTP Requests
+ | HTTP Requests / JSON Responses
  v
 Express.js Backend
  |
@@ -79,9 +91,9 @@ MySQL Database
 ### Request Flow
 
 1. The user interacts with the Next.js frontend.
-2. The frontend sends an HTTP request to the Express backend.
-3. The backend validates and processes the request.
-4. The backend reads or updates data in MySQL.
+2. The frontend sends an HTTP request to the Express.js backend.
+3. The backend processes and validates the request.
+4. The backend reads or updates information in MySQL.
 5. The backend returns a response.
 6. The frontend displays the result.
 
@@ -93,14 +105,12 @@ support-ticket-system/
 |-- backend/
 |   |-- src/
 |   |   |-- controllers/
-|   |   |-- repositories/
 |   |   |-- routes/
 |   |   |-- db.ts
 |   |   |-- server.ts
 |   |-- package.json
 |   |-- tsconfig.json
-|   |-- .env
-|
+|   |
 |-- frontend/
 |   |-- app/
 |   |   |-- agents/
@@ -110,8 +120,9 @@ support-ticket-system/
 |   |   |-- page.tsx
 |   |   |-- layout.tsx
 |   |   |-- globals.css
+|   |-- lib/
 |   |-- package.json
-|
+|   |
 |-- screenshots/
 |
 |-- database.sql
@@ -119,11 +130,11 @@ support-ticket-system/
 |-- .gitignore
 ```
 
-The structure above shows the main project files. Additional files may exist in the frontend and backend folders.
+The structure above shows the main project files. Additional files may exist in the frontend and backend directories.
 
 ## Prerequisites
 
-Install the following:
+Install the following software:
 
 - Node.js and npm
 - MySQL Server
@@ -170,7 +181,11 @@ npm install
 
 ## Environment Variables
 
-Create or update the backend environment file at:
+Environment variables store application configuration outside the source code.
+
+### Backend Configuration
+
+Create or update the environment file:
 
 `backend/.env`
 
@@ -187,16 +202,30 @@ DB_NAME=support_ticket_db
 
 Replace the example database credentials with your local MySQL settings.
 
-The database name used by this project is:
+**Important:** The variable names must match the names used by the backend code. If your project uses different names or a different database name, update this example accordingly.
 
-`support_ticket_db`
+### Frontend Configuration
 
-**Security notes:**
+The frontend API base URL can be configured using:
+
+`frontend/.env.local`
+
+Example:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:5000/api
+```
+
+Ensure that the variable name matches the frontend API configuration.
+
+Restart the frontend development server after changing environment variables.
+
+### Security Notes
 
 - Never commit real database passwords.
 - Do not publish API keys or tokens.
 - Keep `.env` files out of GitHub.
-- Share only example configuration in documentation.
+- Share example configuration in documentation instead of actual secrets.
 
 ## Database Setup
 
@@ -210,52 +239,51 @@ Start MySQL Server and open MySQL Workbench.
 
 Open `database.sql` in MySQL Workbench and execute its SQL statements on a fresh development database.
 
-The setup file creates the database and the main tables:
+The setup file should create the database and the tables defined by the project schema.
+
+The main tables are expected to include:
 
 - `agents`
 - `customers`
 - `tickets`
 
-The `tickets` table connects tickets with customers and optionally assigned agents.
+The actual table names and columns are defined in `database.sql`.
 
 ### 3. Verify the Tables
 
-Run:
+If your database is named `support_ticket_db`, run:
 
 ```sql
 USE support_ticket_db;
-
 SHOW TABLES;
 ```
 
-The expected table names are:
+Ensure that the expected tables are present.
 
-```text
-agents
-customers
-tickets
-```
+### 4. Verify Sample Agents
 
-### 4. Verify the Agents
-
-Run:
+If your schema uses the columns shown below, run:
 
 ```sql
 SELECT id, name, email, department, status
 FROM agents;
 ```
 
-The development database should contain the required five sample support agents for a fresh setup.
-
-If you already have a working database, back it up before making schema changes. Do not delete an existing database to run the setup file.
+For a fresh setup, verify that the required five sample support agents are present if they are part of the assignment requirements.
 
 ### 5. Configure the Backend
 
-Confirm that `backend/.env` contains the correct database name and credentials.
+Confirm that `backend/.env` uses the same database name as the SQL setup.
+
+For example:
 
 ```env
 DB_NAME=support_ticket_db
 ```
+
+**Important:** If `database.sql` creates a database with a different name, use that actual database name in the environment configuration.
+
+If you already have a working database, back it up before making schema changes. Do not delete an existing database just to run the setup file.
 
 ## Running the Application
 
@@ -270,17 +298,19 @@ cd backend
 npm run dev
 ```
 
-The backend runs at:
+The backend is expected to run at:
 
 `http://localhost:5000`
 
+Use the development script defined in `backend/package.json`.
+
 ### Test the Backend Health Check
 
-Open this address in your browser:
+If the health-check endpoint is implemented, open:
 
 `http://localhost:5000/api/health`
 
-Expected response:
+Example response:
 
 ```json
 {
@@ -288,6 +318,8 @@ Expected response:
   "message": "Support Ticket API is running"
 }
 ```
+
+The actual response depends on the backend implementation.
 
 ### Start the Frontend
 
@@ -304,9 +336,10 @@ The frontend normally runs at:
 
 ### Open the Application
 
-- Application: `http://localhost:3000`
+- Dashboard: `http://localhost:3000`
 - Tickets: `http://localhost:3000/tickets`
 - Create Ticket: `http://localhost:3000/tickets/new`
+- Agents: `http://localhost:3000/agents`
 
 The frontend and backend must both be running for API-dependent features to work.
 
@@ -314,7 +347,9 @@ The frontend and backend must both be running for API-dependent features to work
 
 The backend API base URL is:
 
-`http://localhost:5000`
+`http://localhost:5000/api`
+
+The following table documents the intended API structure. Confirm each endpoint against the actual backend routes before treating it as implemented.
 
 ### Ticket APIs
 
@@ -328,6 +363,8 @@ The backend API base URL is:
 | PATCH | `/api/tickets/:id/status` | Update ticket status |
 | PATCH | `/api/tickets/:id/assign` | Assign an agent to a ticket |
 
+Remove any row whose endpoint is not implemented in the submitted version.
+
 ### Agent API
 
 | Method | Endpoint | Description |
@@ -338,7 +375,7 @@ The backend API base URL is:
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/dashboard` | Retrieve dashboard statistics |
+| GET | `/api/dashboard` | Retrieve dashboard statistics and recent tickets |
 
 ### Health Check
 
@@ -346,30 +383,34 @@ The backend API base URL is:
 |---|---|---|
 | GET | `/api/health` | Check backend availability |
 
+Include the health-check endpoint only if it exists in your backend.
+
 ### Ticket List Query Parameters
 
-The ticket list API supports query parameters implemented by the backend, including:
+The ticket list API may support the following parameters, depending on the backend implementation:
 
-- `page` — page number
-- `limit` — number of results per page
-- `search` — search term
-- `status` — ticket status
-- `priority` — ticket priority
-- `category` — ticket category
-- `agentId` — assigned agent
-- `sort` — sorting option
+| Parameter | Description |
+|---|---|
+| `page` | Page number |
+| `limit` | Number of results per page |
+| `search` | Search term |
+| `status` | Ticket status |
+| `priority` | Ticket priority |
+| `category` | Ticket category |
+| `agentId` | Assigned agent ID |
+| `sort` | Sorting option |
 
-Example:
+Example request:
 
 ```text
 GET /api/tickets?page=1&limit=10
 ```
 
-The available values and exact response format depend on the implementation.
+The available parameters and response format depend on the actual implementation.
 
 ### Example Ticket Creation Request
 
-The following is an illustrative example. Use the exact field names and accepted values implemented by the controller.
+The following is an illustrative example. Confirm the accepted field names and values against the backend controller.
 
 ```json
 {
@@ -414,53 +455,157 @@ Example request body:
 }
 ```
 
-Use Postman or another API client to test POST, PUT, PATCH, and DELETE requests.
+Confirm the exact route and request body against the implementation.
 
-Confirm the request fields and allowed values against the actual controller code before relying on these examples.
+Use Postman or another API client to test POST, PUT, PATCH, and DELETE requests where those methods are supported.
+
+## Database Design
+
+The database organizes customer support information into related tables.
+
+### Customers
+
+Stores customer information associated with support requests.
+
+Typical fields may include:
+
+- Customer ID
+- Customer name
+- Customer email
+
+### Agents
+
+Stores information about support agents.
+
+Typical fields may include:
+
+- Agent ID
+- Agent name
+- Agent email
+- Department
+- Status
+
+### Tickets
+
+Stores customer support ticket information.
+
+Typical fields may include:
+
+- Ticket ID
+- Customer reference
+- Assigned agent reference
+- Subject
+- Description
+- Priority
+- Category
+- Status
+- Creation timestamp
+- Update timestamp
+
+### Relationships
+
+- A customer can have multiple tickets.
+- A ticket belongs to a customer.
+- A ticket can be assigned to a support agent.
+- An agent can handle multiple tickets.
+
+The actual columns, constraints, and relationships are defined in `database.sql`.
+
+## Validation and Error Handling
+
+The application should handle invalid input and API failures appropriately.
+
+Examples include:
+
+- Missing required fields
+- Invalid ticket IDs
+- Invalid status or priority values
+- Missing tickets
+- Invalid agent assignments
+- Database connection errors
+- Failed API requests
+
+The frontend should display suitable feedback for loading, empty, and error states where implemented.
+
+## Pagination and Filtering
+
+The ticket listing provides functionality for locating and navigating support tickets.
+
+Depending on the implementation, this includes:
+
+- Search
+- Status filtering
+- Priority filtering
+- Category filtering
+- Agent filtering
+- Sorting by creation date
+- Pagination
+
+These features help users find relevant tickets efficiently.
 
 ## Screenshots
 
-Store actual screenshots in the `screenshots/` folder.
+Store actual application screenshots in the `screenshots/` directory.
 
-Recommended screenshots:
+Recommended filenames:
 
 ```text
 screenshots/
+|-- dashboard.png
 |-- tickets-list.png
 |-- create-ticket.png
 |-- ticket-details.png
-|-- dashboard.png
 |-- responsive-mobile.png
 ```
 
-Include only files that actually exist in the repository.
+Only include screenshots that actually exist in the repository.
 
-For example, to display the ticket listing screenshot:
+### Dashboard
 
-```markdown
+![Dashboard](screenshots/dashboard.png)
+
+### All Tickets
+
 ![Tickets List](screenshots/tickets-list.png)
-```
 
-Screenshots should demonstrate the actual interface, ticket management functionality, and responsive behavior.
+### Create Ticket
+
+![Create Ticket](screenshots/create-ticket.png)
+
+### Ticket Details
+
+![Ticket Details](screenshots/ticket-details.png)
+
+### Responsive Layout
+
+![Responsive Mobile Layout](screenshots/responsive-mobile.png)
+
+Rename the screenshot files or update the paths above to match your actual filenames.
 
 ## Validation and Testing
 
 ### Backend Checks
 
+Verify the following where applicable:
+
 - Backend starts successfully.
-- Health-check endpoint responds.
 - Database connection works.
+- Health-check endpoint responds.
 - Ticket list endpoint responds.
-- Ticket creation is validated.
+- Ticket creation works.
 - Ticket details can be retrieved.
 - Ticket updates work.
+- Ticket deletion works if implemented.
 - Ticket status updates work.
 - Agent assignment works.
 - Invalid input is handled appropriately.
 
 ### Frontend Checks
 
+Verify the following:
+
 - Application opens successfully.
+- Dashboard statistics load.
 - Tickets are displayed.
 - Ticket creation form works.
 - Ticket details page loads.
@@ -468,12 +613,14 @@ Screenshots should demonstrate the actual interface, ticket management functiona
 - Sorting works.
 - Pagination works.
 - Status updates work.
-- Agent assignment works if exposed in the interface.
+- Agent assignment works if supported in the interface.
 - Loading and error states are handled.
+
+Only report tests that have actually been performed.
 
 ### Responsive Design
 
-Test the application at these viewport widths:
+Test the application at the following viewport widths:
 
 | Width | Device Type |
 |---|---|
@@ -484,35 +631,9 @@ Test the application at these viewport widths:
 
 Check that forms, tables, navigation, and buttons remain usable at smaller widths.
 
-Only report tests that have actually been performed.
-
-## Pagination
-
-The ticket listing API supports pagination through query parameters.
-
-Example:
-
-```text
-GET /api/tickets?page=1&limit=10
-```
-
-The frontend can use the returned pagination information to display the appropriate page of results.
-
-## Error Handling
-
-The application should handle errors such as:
-
-- Invalid ticket IDs
-- Invalid request data
-- Missing tickets
-- Database connection failures
-- Failed API requests
-
-The frontend should provide useful feedback when an operation fails.
-
 ## Known Limitations
 
-Document any limitations that remain in the current implementation.
+Document any limitations that remain in the submitted implementation.
 
 Potential examples include:
 
@@ -534,8 +655,9 @@ Potential enhancements include:
 - Real-time ticket updates
 - Audit logging
 - Automated frontend and backend tests
+- Production deployment
 
-## Version Control
+## Repository
 
 GitHub Repository:
 
@@ -545,4 +667,4 @@ https://github.com/shajahanm8220-star/support-ticket-system
 
 The Support Ticket Management System demonstrates a full-stack application connecting a Next.js frontend, an Express.js backend, and a MySQL database.
 
-The project provides practical experience with React, TypeScript, REST APIs, database operations, ticket management, validation, responsive design, and version control.
+The project provides practical experience with TypeScript, REST API development, database integration, ticket management, responsive design, and version control.
